@@ -24,24 +24,6 @@ public class JwtService {
     @Value("${application.security.jwt.expiration}")
     private long jwtExpiration;
 
-    public String generateToken(User user) {
-        Map<String, Object> extraClaims = new HashMap<>();
-        extraClaims.put("role", user.getRole().name());
-        extraClaims.put("userId", user.getUserId());
-
-        return buildToken(extraClaims, user.getEmail(), jwtExpiration);
-    }
-
-    private String buildToken(Map<String, Object> extraClaims, String subject, long expiration) {
-        return Jwts.builder()
-                .claims(extraClaims)
-                .subject(subject)
-                .issuedAt(new Date(System.currentTimeMillis()))
-                .expiration(new Date(System.currentTimeMillis() + expiration))
-                .signWith(getSignInKey(), Jwts.SIG.HS256)
-                .compact();
-    }
-
     public String extractUsername(String token) {
         return extractClaim(token, Claims::getSubject);
     }
@@ -51,9 +33,28 @@ public class JwtService {
         return claimsResolver.apply(claims);
     }
 
+    public String generateToken(User user) {
+        Map<String, Object> extraClaims = new HashMap<>();
+        extraClaims.put("role", user.getRole().name());
+        extraClaims.put("userId", user.getUserId());
+        // buildToken теперь возвращает String, как и положено
+        return buildToken(extraClaims, user.getEmail(), jwtExpiration);
+    }
+
     public boolean isTokenValid(String token, UserDetails userDetails) {
         final String username = extractUsername(token);
         return (username.equals(userDetails.getUsername())) && !isTokenExpired(token);
+    }
+
+    // ИСПРАВЛЕНО: тип возвращаемого значения изменен на String
+    private String buildToken(Map<String, Object> extraClaims, String subject, long expiration) {
+        return Jwts.builder()
+                .claims(extraClaims)
+                .subject(subject)
+                .issuedAt(new Date(System.currentTimeMillis()))
+                .expiration(new Date(System.currentTimeMillis() + expiration))
+                .signWith(getSignInKey(), Jwts.SIG.HS256)
+                .compact();
     }
 
     private boolean isTokenExpired(String token) {
