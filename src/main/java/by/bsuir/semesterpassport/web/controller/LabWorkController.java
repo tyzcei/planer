@@ -31,12 +31,13 @@ public class LabWorkController {
                 .map(lab -> new LabWorkDisplayDTO(
                         lab.getLabId(),
                         lab.getTitle(),
-                        lab.getSubject().getTitle(),
-                        lab.getPractitioner().getFullName(),
+                        // Безопасная проверка на null:
+                        lab.getSubject() != null ? lab.getSubject().getTitle() : "Предмет не указан",
+                        lab.getPractitioner() != null ? lab.getPractitioner().getFullName() : "Не назначен",
                         lab.getComplexity(),
                         lab.getDeadline(),
                         lab.getCurrentStatus().name(),
-                        prioritySorterService.calculateScore(lab) // UC-9: Расчет P = S + T
+                        prioritySorterService.calculateScore(lab)
                 ))
                 .collect(Collectors.toList());
 

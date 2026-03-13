@@ -1,12 +1,10 @@
 spring:
-  application:
-    name: semester-passport
-
   datasource:
-    url: jdbc:postgresql://localhost:5432/planer
+    # Порт 3306 - стандартный для MySQL
+    url: jdbc:mysql://localhost:3306/planer?serverTimezone=UTC&characterEncoding=UTF-8
     username: root
-    password: root
-    driver-class-name: org.postgresql.Driver
+    password: root  # Если пароля нет (как часто бывает в XAMPP), оставь тут пустое место!
+    driver-class-name: com.mysql.cj.jdbc.Driver
 
   jpa:
     hibernate:
@@ -15,12 +13,13 @@ spring:
     properties:
       hibernate:
         format_sql: true
-        dialect: org.hibernate.dialect.PostgreSQLDialect
+        # Меняем диалект с Postgre на MySQL
+        dialect: org.hibernate.dialect.MySQLDialect
 
-  data:
-    redis:
-      host: localhost
-      port: 6379
+#  data:
+#    redis:
+#      host: localhost
+#      port: 6379
 
 # Настройки для JwtService (должны соответствовать пути в @Value)
 application:
@@ -32,14 +31,14 @@ application:
 server:
   port: 8080
 
-spring:
-  security:
-    oauth2:
-      client:
-        registration:
-          github:
-            client-id: ${GITHUB_CLIENT_ID}
-            client-secret: ${GITHUB_CLIENT_SECRET}
-            scope:
-              - user:email
-              - read:user
+#spring:
+#  security:
+#    oauth2:
+#      client:
+#        registration:
+#          github:
+#            client-id: ${GITHUB_CLIENT_ID}
+#            client-secret: ${GITHUB_CLIENT_SECRET}
+#            scope:
+#              - user:email
+#              - read:user

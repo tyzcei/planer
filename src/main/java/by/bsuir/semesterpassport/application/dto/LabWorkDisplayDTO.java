@@ -6,7 +6,7 @@ public record LabWorkDisplayDTO(
         Long labId,
         String title,
         String subjectTitle,
-        String practitionerName,
+        String practitionerName, // Вернули преподавателя на 4-е место!
         Integer complexity,
         LocalDateTime deadline,
         String status,
