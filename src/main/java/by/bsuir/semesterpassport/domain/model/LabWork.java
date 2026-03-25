@@ -21,110 +21,60 @@ public class LabWork {
 
     @ManyToOne(fetch = FetchType.LAZY)
     @JoinColumn(name = "practitioner_id")
-    private Teacher practitioner; // Тот самый практик, который принимает лабы
+    private Teacher practitioner;
 
     @Column(nullable = false)
     private String title;
 
     @Column(nullable = false)
-    private Integer complexity; // Параметр S (1-5) [cite: 170]
+    private Integer complexity;
 
     private LocalDateTime deadline;
 
     @Enumerated(EnumType.STRING)
     @Column(name = "current_status")
-    private LabStatus currentStatus; // RECEIVED, CODED, READY, SUBMITTED, PROTECTED [cite: 374]
+    private LabStatus currentStatus;
 
     private LocalDateTime createdAt;
     private LocalDateTime updatedAt;
 
     public LabWork() {}
 
-    // Жизненный цикл сущности (Метаданные)
     @PrePersist
     protected void onCreate() {
         createdAt = LocalDateTime.now();
         updatedAt = LocalDateTime.now();
-        if (currentStatus == null) {
-            currentStatus = LabStatus.RECEIVED;
-        }
+        if (currentStatus == null) currentStatus = LabStatus.RECEIVED;
     }
 
     @PreUpdate
-    protected void onUpdate() {
-        updatedAt = LocalDateTime.now();
-    }
+    protected void onUpdate() { updatedAt = LocalDateTime.now(); }
 
-    // Геттеры и Сеттеры (Полный список)
-    public Long getLabId() {
-        return labId;
-    }
+    // Геттеры и Сеттеры
+    public Long getLabId() { return labId; }
+    public void setLabId(Long labId) { this.labId = labId; }
 
-    public void setLabId(Long labId) {
-        this.labId = labId;
-    }
+    public User getUser() { return user; }
+    public void setUser(User user) { this.user = user; }
 
-    public User getUser() {
-        return user;
-    }
+    public Subject getSubject() { return subject; }
+    public void setSubject(Subject subject) { this.subject = subject; }
 
-    public void setUser(User user) {
-        this.user = user;
-    }
+    public Teacher getPractitioner() { return practitioner; }
+    public void setPractitioner(Teacher practitioner) { this.practitioner = practitioner; }
 
-    public Subject getSubject() {
-        return subject;
-    }
+    public String getTitle() { return title; }
+    public void setTitle(String title) { this.title = title; }
 
-    public void setSubject(Subject subject) {
-        this.subject = subject;
-    }
+    public Integer getComplexity() { return complexity; }
+    public void setComplexity(Integer complexity) { this.complexity = complexity; }
 
-    public Teacher getPractitioner() {
-        return practitioner;
-    }
+    public LocalDateTime getDeadline() { return deadline; }
+    public void setDeadline(LocalDateTime deadline) { this.deadline = deadline; }
 
-    public void setPractitioner(Teacher practitioner) {
-        this.practitioner = practitioner;
-    }
+    public LabStatus getCurrentStatus() { return currentStatus; }
+    public void setCurrentStatus(LabStatus currentStatus) { this.currentStatus = currentStatus; }
 
-    public String getTitle() {
-        return title;
-    }
-
-    public void setTitle(String title) {
-        this.title = title;
-    }
-
-    public Integer getComplexity() {
-        return complexity;
-    }
-
-    public void setComplexity(Integer complexity) {
-        this.complexity = complexity;
-    }
-
-    public LocalDateTime getDeadline() {
-        return deadline;
-    }
-
-    public void setDeadline(LocalDateTime deadline) {
-        this.deadline = deadline;
-    }
-
-    public LabStatus getCurrentStatus() {
-        return currentStatus;
-    }
-
-    public void setCurrentStatus(LabStatus currentStatus) {
-        this.currentStatus = currentStatus;
-    }
-
-    public LocalDateTime getCreatedAt() {
-        return createdAt;
-    }
-
-    public LocalDateTime getUpdatedAt() {
-        return updatedAt;
-    }
+    public LocalDateTime getCreatedAt() { return createdAt; }
+    public LocalDateTime getUpdatedAt() { return updatedAt; }
 }

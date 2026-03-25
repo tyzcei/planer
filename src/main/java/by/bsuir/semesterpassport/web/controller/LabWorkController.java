@@ -14,60 +14,74 @@ import java.util.stream.Collectors;
 
 @RestController
 @RequestMapping("/api/v1/labs")
-@CrossOrigin("*")
+@CrossOrigin("*") // Разрешаем запросы с фронтенда
 public class LabWorkController {
 
     private final LabWorkService labWorkService;
-    // ИСПРАВЛЕНО: Тип должен быть PrioritySorterService (с большой буквы)
     private final PrioritySorterService prioritySorterService;
 
-    // Ручной конструктор
     public LabWorkController(LabWorkService labWorkService, PrioritySorterService prioritySorterService) {
         this.labWorkService = labWorkService;
         this.prioritySorterService = prioritySorterService;
     }
 
+    // Получение списка для дашборда (с сортировкой)
     @GetMapping("/dashboard")
     public ResponseEntity<List<LabWorkDisplayDTO>> getDashboard(@RequestParam Long userId) {
         List<LabWork> sortedLabs = labWorkService.getStudentLabsSorted(userId);
-
         List<LabWorkDisplayDTO> response = sortedLabs.stream()
-                .map(lab -> new LabWorkDisplayDTO(
-                        lab.getLabId(),
-                        lab.getTitle(),
-                        lab.getSubject() != null ? lab.getSubject().getTitle() : "Предмет не указан",
-                        lab.getPractitioner() != null ? lab.getPractitioner().getFullName() : "Не назначен",
-                        lab.getComplexity(),
-                        lab.getDeadline(),
-                        lab.getCurrentStatus().name(),
-                        prioritySorterService.calculateScore(lab)
-                ))
+                .map(this::convertToDTO)
                 .collect(Collectors.toList());
-
         return ResponseEntity.ok(response);
     }
 
+    // Создание новой лабы
     @PostMapping
-    public ResponseEntity<LabWork> createLab(@RequestBody LabWorkRequest request) {
+    public ResponseEntity<LabWorkDisplayDTO> createLab(@RequestBody LabWorkRequest request) {
+        // Сначала создаем лабу в сервисе
         LabWork createdLab = labWorkService.createLab(request);
-        return ResponseEntity.status(HttpStatus.CREATED).body(createdLab);
+        // Сразу превращаем её в DTO и отправляем фронтенду
+        return ResponseEntity.status(HttpStatus.CREATED).body(convertToDTO(createdLab));
     }
 
+    // Переключение статуса (Клик по кнопке на карточке)
     @PatchMapping("/{id}/toggle-status")
     public ResponseEntity<LabWorkDisplayDTO> toggleStatus(@PathVariable Long id, @RequestParam Long userId) {
         LabWork updated = labWorkService.toggleStatus(id, userId);
+        return ResponseEntity.ok(convertToDTO(updated));
+    }
 
-        LabWorkDisplayDTO dto = new LabWorkDisplayDTO(
-                updated.getLabId(),
-                updated.getTitle(),
-                updated.getSubject() != null ? updated.getSubject().getTitle() : "Предмет не указан",
-                "Не назначен",
-                updated.getComplexity(),
-                updated.getDeadline(),
-                updated.getCurrentStatus().name(),
-                prioritySorterService.calculateScore(updated)
+    // Удаление лабы
+    @DeleteMapping("/{id}")
+    public ResponseEntity<Void> deleteLab(@PathVariable Long id) {
+        labWorkService.deleteLab(id);
+        return ResponseEntity.noContent().build();
+    }
+
+    // Редактирование (Обновление данных)
+    @PutMapping("/{id}")
+    public ResponseEntity<LabWorkDisplayDTO> updateLab(@PathVariable Long id, @RequestBody LabWorkRequest request) {
+        // Обновляем лабу
+        LabWork updatedLab = labWorkService.updateLab(id, request);
+        // Возвращаем DTO вместо "грязной" сущности LabWork
+        return ResponseEntity.ok(convertToDTO(updatedLab));
+    }
+
+    /**
+     * Вспомогательный метод для превращения модели в DTO.
+     * ВАЖНО: Порядок аргументов должен строго совпадать с конструктором LabWorkDisplayDTO!
+     */
+    private LabWorkDisplayDTO convertToDTO(LabWork lab) {
+        return new LabWorkDisplayDTO(
+                lab.getLabId(),
+                lab.getTitle(),
+                lab.getSubject() != null ? lab.getSubject().getTitle() : "Предмет не указан",
+                lab.getSubject() != null ? lab.getSubject().getSubjectId() : null, // ДОБАВИЛИ ID ПРЕДМЕТА
+                lab.getPractitioner() != null ? lab.getPractitioner().getFullName() : "Не назначен",
+                lab.getComplexity(),
+                lab.getDeadline(),
+                lab.getCurrentStatus().name(), // Это поле на фронте ловится как 'status'
+                prioritySorterService.calculateScore(lab)
         );
-
-        return ResponseEntity.ok(dto);
     }
 }
