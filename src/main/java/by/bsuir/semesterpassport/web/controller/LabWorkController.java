@@ -14,17 +14,19 @@ import java.util.stream.Collectors;
 
 @RestController
 @RequestMapping("/api/v1/labs")
+@CrossOrigin("*")
 public class LabWorkController {
 
     private final LabWorkService labWorkService;
+    // ИСПРАВЛЕНО: Тип должен быть PrioritySorterService (с большой буквы)
     private final PrioritySorterService prioritySorterService;
 
+    // Ручной конструктор
     public LabWorkController(LabWorkService labWorkService, PrioritySorterService prioritySorterService) {
         this.labWorkService = labWorkService;
         this.prioritySorterService = prioritySorterService;
     }
 
-    // UC-11: Получение списка приоритетных задач для Dashboard
     @GetMapping("/dashboard")
     public ResponseEntity<List<LabWorkDisplayDTO>> getDashboard(@RequestParam Long userId) {
         List<LabWork> sortedLabs = labWorkService.getStudentLabsSorted(userId);
@@ -33,7 +35,6 @@ public class LabWorkController {
                 .map(lab -> new LabWorkDisplayDTO(
                         lab.getLabId(),
                         lab.getTitle(),
-                        // Безопасная проверка на null:
                         lab.getSubject() != null ? lab.getSubject().getTitle() : "Предмет не указан",
                         lab.getPractitioner() != null ? lab.getPractitioner().getFullName() : "Не назначен",
                         lab.getComplexity(),
@@ -46,13 +47,8 @@ public class LabWorkController {
         return ResponseEntity.ok(response);
     }
 
-    // Добавь в LabWorkController.java
-
-    // Добавь в LabWorkController.java
-
     @PostMapping
     public ResponseEntity<LabWork> createLab(@RequestBody LabWorkRequest request) {
-        // Вызываем сервис для сохранения лабы
         LabWork createdLab = labWorkService.createLab(request);
         return ResponseEntity.status(HttpStatus.CREATED).body(createdLab);
     }
@@ -61,12 +57,11 @@ public class LabWorkController {
     public ResponseEntity<LabWorkDisplayDTO> toggleStatus(@PathVariable Long id, @RequestParam Long userId) {
         LabWork updated = labWorkService.toggleStatus(id, userId);
 
-        // Возвращаем DTO, чтобы фронтенд сразу увидел новый статус и приоритет
         LabWorkDisplayDTO dto = new LabWorkDisplayDTO(
                 updated.getLabId(),
                 updated.getTitle(),
-                updated.getSubject().getTitle(),
-                updated.getPractitioner() != null ? updated.getPractitioner().getFullName() : "Не назначен",
+                updated.getSubject() != null ? updated.getSubject().getTitle() : "Предмет не указан",
+                "Не назначен",
                 updated.getComplexity(),
                 updated.getDeadline(),
                 updated.getCurrentStatus().name(),

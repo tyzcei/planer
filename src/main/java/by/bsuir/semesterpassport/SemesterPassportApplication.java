@@ -1,18 +1,17 @@
 package by.bsuir.semesterpassport;
 
-import org.springframework.boot.SpringApplication;
-import org.springframework.boot.autoconfigure.SpringBootApplication;
-import org.springframework.context.annotation.Bean;
 import by.bsuir.semesterpassport.domain.model.Role;
 import by.bsuir.semesterpassport.domain.model.User;
 import by.bsuir.semesterpassport.domain.repository.UserRepository;
+import by.bsuir.semesterpassport.domain.model.LabStatus;
+import by.bsuir.semesterpassport.domain.model.Subject;
+import by.bsuir.semesterpassport.domain.repository.LabWorkRepository;
+import by.bsuir.semesterpassport.domain.repository.SubjectRepository;
 import org.springframework.boot.CommandLineRunner;
 import org.springframework.boot.SpringApplication;
 import org.springframework.boot.autoconfigure.SpringBootApplication;
 import org.springframework.context.annotation.Bean;
 import org.springframework.security.crypto.password.PasswordEncoder;
-import by.bsuir.semesterpassport.domain.model.*;
-import by.bsuir.semesterpassport.domain.repository.*;
 
 import java.time.LocalDateTime;
 
@@ -30,52 +29,27 @@ public class SemesterPassportApplication {
                                       PasswordEncoder passwordEncoder) {
         return args -> {
             String email = "a@a";
-            User user = userRepository.findByEmail(email).orElseGet(() -> {
-                User u = new User();
-                u.setEmail(email);
-                u.setFirstName("Alexandra");
-                u.setPasswordHash(passwordEncoder.encode("a"));
-                u.setRole(Role.STUDENT);
-                return userRepository.save(u);
-            });
 
-            // 1. Создаем предмет, если его нет
-            Subject ris = subjectRepository.findAll().stream()
-                    .filter(s -> s.getTitle().equals("РИS"))
-                    .findFirst()
-                    .orElseGet(() -> {
-                        Subject s = new Subject();
-                        s.setTitle("РИS");
-                        s.setControlType("ЭКЗАМЕН");
-                        return subjectRepository.save(s);
-                    });
+            // Ищем пользователя, если нет - создаем, если есть - ПРИНУДИТЕЛЬНО обновляем пароль
+            User user = userRepository.findByEmail(email).orElse(new User());
+            user.setEmail(email);
+            user.setFirstName("Alexandra");
+            user.setLastName("Lapteva");
+            user.setGroupNumber("314302");
+            user.setRole(Role.STUDENT);
+            // ПЕРЕЗАПИСЫВАЕМ ПАРОЛЬ ПРИ КАЖДОМ СТАРТЕ (для тестов)
+            user.setPasswordHash(passwordEncoder.encode("a"));
+            userRepository.save(user);
 
-            // 2. Создаем тестовые лабы, если у юзера пусто
-            if (labWorkRepository.findAllByUserUserId(user.getUserId()).isEmpty()) {
-                // Лаба 1: Сложная, дедлайн через месяц (Низкий приоритет)
-                createLab(labWorkRepository, user, ris, "Лабораторная №1", 5, LocalDateTime.now().plusMonths(1));
+            System.out.println(">>> Пользователь a@a готов. Пароль установлен в 'a'");
 
-                // Лаба 2: Легкая, но дедлайн ЗАВТРА (Высокий приоритет!)
-                createLab(labWorkRepository, user, ris, "Лабораторная №2", 1, LocalDateTime.now().plusDays(1));
-
-                // Лаба 3: Средняя, дедлайн через неделю
-                createLab(labWorkRepository, user, ris, "Лабораторная №3", 3, LocalDateTime.now().plusWeeks(1));
-
-                System.out.println(">>> Тестовые лабы для Dashboard созданы!");
+            // 1. Создаем тестовый предмет
+            if (subjectRepository.count() == 0) {
+                Subject ris = new Subject();
+                ris.setTitle("РИS");
+                ris.setControlType("ЭКЗАМЕН");
+                subjectRepository.save(ris);
             }
         };
     }
-
-    // Вспомогательный метод
-    private void createLab(LabWorkRepository repo, User user, Subject sub, String title, int complexity, LocalDateTime deadline) {
-        LabWork lab = new LabWork();
-        lab.setUser(user);
-        lab.setSubject(sub);
-        lab.setTitle(title);
-        lab.setComplexity(complexity);
-        lab.setDeadline(deadline);
-        lab.setCurrentStatus(LabStatus.RECEIVED);
-        repo.save(lab);
-    }
-
 }
