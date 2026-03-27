@@ -1,11 +1,17 @@
 package by.bsuir.semesterpassport.domain.model;
 
 import jakarta.persistence.*;
+import org.springframework.security.core.GrantedAuthority;
+import org.springframework.security.core.authority.SimpleGrantedAuthority;
+import org.springframework.security.core.userdetails.UserDetails;
+
 import java.time.LocalDateTime;
+import java.util.Collection;
+import java.util.List;
 
 @Entity
 @Table(name = "users")
-public class User {
+public class User implements UserDetails { // ИСПРАВЛЕНО: добавили имплементацию
 
     @Id
     @GeneratedValue(strategy = GenerationType.IDENTITY)
@@ -33,6 +39,7 @@ public class User {
     protected void onCreate() {
         createdAt = LocalDateTime.now();
         updatedAt = LocalDateTime.now();
+        if (role == null) role = Role.STUDENT; // Дефолтная роль
     }
 
     @PreUpdate
@@ -40,7 +47,38 @@ public class User {
         updatedAt = LocalDateTime.now();
     }
 
-    // Геттеры и сеттеры (вручную)
+    // --- МЕТОДЫ SPRING SECURITY (UserDetails) ---
+
+    @Override
+    public Collection<? extends GrantedAuthority> getAuthorities() {
+        // Превращаем наш Enum Role в объект, который понимает Spring
+        return List.of(new SimpleGrantedAuthority(role.name()));
+    }
+
+    @Override
+    public String getPassword() {
+        return passwordHash;
+    }
+
+    @Override
+    public String getUsername() {
+        return email; // Наш логин — это email
+    }
+
+    @Override
+    public boolean isAccountNonExpired() { return true; }
+
+    @Override
+    public boolean isAccountNonLocked() { return true; }
+
+    @Override
+    public boolean isCredentialsNonExpired() { return true; }
+
+    @Override
+    public boolean isEnabled() { return true; }
+
+    // --- Твои стандартные Геттеры и сеттеры ---
+
     public Long getUserId() { return userId; }
     public void setUserId(Long userId) { this.userId = userId; }
 

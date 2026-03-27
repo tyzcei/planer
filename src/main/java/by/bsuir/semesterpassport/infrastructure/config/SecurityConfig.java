@@ -20,7 +20,7 @@ import java.util.List;
 
 @Configuration
 @EnableWebSecurity
-@EnableMethodSecurity
+@EnableMethodSecurity // Позволяет использовать @PreAuthorize в контроллерах
 public class SecurityConfig {
 
     private final JwtAuthenticationFilter jwtAuthFilter;
@@ -31,18 +31,25 @@ public class SecurityConfig {
         this.authenticationProvider = authenticationProvider;
     }
 
-
-
     @Bean
     public SecurityFilterChain securityFilterChain(HttpSecurity http) throws Exception {
         http
                 .cors(cors -> cors.configurationSource(corsConfigurationSource()))
                 .csrf(AbstractHttpConfigurer::disable)
                 .authorizeHttpRequests(auth -> auth
-                        // РАЗРЕШАЕМ все предзапросы (OPTIONS) — это критично для React!
+                        // 1. Критично для React: разрешаем все предзапросы OPTIONS
                         .requestMatchers(HttpMethod.OPTIONS, "/**").permitAll()
+
+                        // 2. Публичные эндпоинты (регистрация, вход)
                         .requestMatchers("/api/v1/auth/**").permitAll()
+
+                        // 3. АДМИН-ПАНЕЛЬ: только для пользователей с ролью ADMIN
                         .requestMatchers("/api/v1/admin/**").hasAuthority("ADMIN")
+
+                        // 4. УПРАВЛЕНИЕ ГРУППОЙ: создание лаб для всех (доступно Админу и Старосте)
+                        .requestMatchers("/api/v1/labs/group-creation").hasAnyAuthority("ADMIN", "GROUP_LEADER")
+
+                        // 5. Остальные запросы (личные лабы, статы и т.д.) только после логина
                         .anyRequest().authenticated()
                 )
                 .sessionManagement(session -> session
@@ -54,18 +61,24 @@ public class SecurityConfig {
         return http.build();
     }
 
-    // Тот самый "мост" для React
     @Bean
     public CorsConfigurationSource corsConfigurationSource() {
         CorsConfiguration configuration = new CorsConfiguration();
-        // Разрешаем адрес нашего фронтенда
+
+        // Разрешаем фронтенд на Vite (стандартный порт 5173)
         configuration.setAllowedOrigins(List.of("http://localhost:5173"));
-        // Разрешаем стандартные методы
+
+        // Полный список методов для CRUD
         configuration.setAllowedMethods(Arrays.asList("GET", "POST", "PUT", "PATCH", "DELETE", "OPTIONS"));
-        // Разрешаем все заголовки (включая Authorization для JWT)
-        configuration.setAllowedHeaders(List.of("*"));
-        // Разрешаем передачу куки и токенов
+
+        // Разрешаем передачу заголовка Authorization и Content-Type
+        configuration.setAllowedHeaders(Arrays.asList("Authorization", "Content-Type", "Accept", "X-Requested-With"));
+
+        // Позволяет фронтенду читать заголовок Authorization, если нужно
+        configuration.setExposedHeaders(List.of("Authorization"));
+
         configuration.setAllowCredentials(true);
+        configuration.setMaxAge(3600L); // Кешируем CORS-ответ на час
 
         UrlBasedCorsConfigurationSource source = new UrlBasedCorsConfigurationSource();
         source.registerCorsConfiguration("/**", configuration);

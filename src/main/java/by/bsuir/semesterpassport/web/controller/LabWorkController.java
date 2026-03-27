@@ -84,4 +84,11 @@ public class LabWorkController {
                 prioritySorterService.calculateScore(lab)
         );
     }
+
+    @PostMapping("/group-creation")
+    public ResponseEntity<Void> createGroupLab(@RequestBody LabWorkRequest request) {
+        // Вызываем массовое создание
+        labWorkService.createLabForGroup(request);
+        return ResponseEntity.status(HttpStatus.CREATED).build();
+    }
 }

@@ -18,11 +18,14 @@ import java.util.function.Function;
 @Service
 public class JwtService {
 
-    @Value("${application.security.jwt.secret-key}")
+    // Используем одну переменную для секрета из application.properties
+    @Value("${application.security.jwt.secret-key:default_secret_key_32_characters_long_min}")
     private String secretKey;
 
-    @Value("${application.security.jwt.expiration}")
+    @Value("${application.security.jwt.expiration:86400000}") // по умолчанию 24 часа
     private long jwtExpiration;
+
+    // --- ИЗВЛЕЧЕНИЕ ДАННЫХ ---
 
     public String extractUsername(String token) {
         return extractClaim(token, Claims::getSubject);
@@ -33,28 +36,29 @@ public class JwtService {
         return claimsResolver.apply(claims);
     }
 
+    // --- ГЕНЕРАЦИЯ ТОКЕНА ---
+
     public String generateToken(User user) {
         Map<String, Object> extraClaims = new HashMap<>();
+        // Зашиваем все нужные фронтенду данные прямо в "паспорт" (токен)
         extraClaims.put("role", user.getRole().name());
         extraClaims.put("userId", user.getUserId());
-        // buildToken теперь возвращает String, как и положено
-        return buildToken(extraClaims, user.getEmail(), jwtExpiration);
+        extraClaims.put("groupNumber", user.getGroupNumber());
+
+        return Jwts.builder()
+                .claims(extraClaims)
+                .subject(user.getEmail())
+                .issuedAt(new Date(System.currentTimeMillis()))
+                .expiration(new Date(System.currentTimeMillis() + jwtExpiration))
+                .signWith(getSignInKey(), Jwts.SIG.HS256)
+                .compact();
     }
+
+    // --- ВАЛИДАЦИЯ ---
 
     public boolean isTokenValid(String token, UserDetails userDetails) {
         final String username = extractUsername(token);
         return (username.equals(userDetails.getUsername())) && !isTokenExpired(token);
-    }
-
-    // ИСПРАВЛЕНО: тип возвращаемого значения изменен на String
-    private String buildToken(Map<String, Object> extraClaims, String subject, long expiration) {
-        return Jwts.builder()
-                .claims(extraClaims)
-                .subject(subject)
-                .issuedAt(new Date(System.currentTimeMillis()))
-                .expiration(new Date(System.currentTimeMillis() + expiration))
-                .signWith(getSignInKey(), Jwts.SIG.HS256)
-                .compact();
     }
 
     private boolean isTokenExpired(String token) {
@@ -65,6 +69,8 @@ public class JwtService {
         return extractClaim(token, Claims::getExpiration);
     }
 
+    // --- СЛУЖЕБНЫЕ МЕТОДЫ ---
+
     private Claims extractAllClaims(String token) {
         return Jwts.parser()
                 .verifyWith(getSignInKey())
@@ -74,6 +80,7 @@ public class JwtService {
     }
 
     private SecretKey getSignInKey() {
+        // Кодируем строку секрета в байты для алгоритма HMAC
         byte[] keyBytes = secretKey.getBytes(StandardCharsets.UTF_8);
         return Keys.hmacShaKeyFor(keyBytes);
     }
