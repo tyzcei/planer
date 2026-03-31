@@ -8,8 +8,13 @@ import by.bsuir.semesterpassport.domain.model.User;
 import by.bsuir.semesterpassport.domain.repository.LabWorkRepository;
 import by.bsuir.semesterpassport.domain.repository.SubjectRepository;
 import by.bsuir.semesterpassport.domain.repository.UserRepository;
+import org.springframework.http.ResponseEntity;
+import org.springframework.security.access.prepost.PreAuthorize;
+import org.springframework.security.core.context.SecurityContextHolder;
 import org.springframework.stereotype.Service;
 import org.springframework.transaction.annotation.Transactional;
+import org.springframework.web.bind.annotation.PostMapping;
+import org.springframework.web.bind.annotation.RequestBody;
 
 import java.time.LocalDateTime;
 import java.util.List;
@@ -104,29 +109,23 @@ public class LabWorkService {
     // Добавь этот метод в существующий LabWorkService.java
 
     @Transactional
-    public void createLabForGroup(LabWorkRequest request) {
-        // 1. Находим того, кто создает (старосту)
-        User leader = userRepository.findById(request.getUserId())
-                .orElseThrow(() -> new RuntimeException("Староста не найден"));
-
-        // 2. Находим всех студентов этой группы
-        List<User> students = userRepository.findAllByGroupNumber(leader.getGroupNumber());
+    public void broadcastLabToGroup(LabWorkRequest request, String groupNumber) {
+        List<User> students = userRepository.findAllByGroupNumber(groupNumber);
 
         Subject subject = subjectRepository.findById(request.getSubjectId())
                 .orElseThrow(() -> new RuntimeException("Предмет не найден"));
 
-        // 3. Создаем копию лабы для каждого студента
-        List<LabWork> groupLabs = students.stream().map(student -> {
+        List<LabWork> labsToSave = students.stream().map(student -> {
             LabWork lab = new LabWork();
             lab.setTitle(request.getTitle());
             lab.setComplexity(request.getComplexity());
             lab.setDeadline(request.getDeadline());
             lab.setSubject(subject);
-            lab.setUser(student); // Привязываем к студенту
+            lab.setUser(student);
             lab.setCurrentStatus(LabStatus.RECEIVED);
             return lab;
         }).collect(Collectors.toList());
 
-        labWorkRepository.saveAll(groupLabs);
+        labWorkRepository.saveAll(labsToSave);
     }
 }

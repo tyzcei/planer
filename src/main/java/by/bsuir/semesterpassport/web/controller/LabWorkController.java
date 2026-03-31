@@ -5,8 +5,12 @@ import by.bsuir.semesterpassport.application.dto.LabWorkRequest;
 import by.bsuir.semesterpassport.application.service.LabWorkService;
 import by.bsuir.semesterpassport.application.service.PrioritySorterService;
 import by.bsuir.semesterpassport.domain.model.LabWork;
+import by.bsuir.semesterpassport.domain.model.User;
+import by.bsuir.semesterpassport.domain.repository.UserRepository;
 import org.springframework.http.HttpStatus;
 import org.springframework.http.ResponseEntity;
+import org.springframework.security.access.prepost.PreAuthorize;
+import org.springframework.security.core.context.SecurityContextHolder;
 import org.springframework.web.bind.annotation.*;
 
 import java.util.List;
@@ -19,10 +23,12 @@ public class LabWorkController {
 
     private final LabWorkService labWorkService;
     private final PrioritySorterService prioritySorterService;
+    private final UserRepository userRepository;
 
-    public LabWorkController(LabWorkService labWorkService, PrioritySorterService prioritySorterService) {
+    public LabWorkController(LabWorkService labWorkService, PrioritySorterService prioritySorterService, UserRepository userRepository) {
         this.labWorkService = labWorkService;
         this.prioritySorterService = prioritySorterService;
+        this.userRepository=userRepository;
     }
 
     // Получение списка для дашборда (с сортировкой)
@@ -85,10 +91,27 @@ public class LabWorkController {
         );
     }
 
-    @PostMapping("/group-creation")
-    public ResponseEntity<Void> createGroupLab(@RequestBody LabWorkRequest request) {
-        // Вызываем массовое создание
-        labWorkService.createLabForGroup(request);
-        return ResponseEntity.status(HttpStatus.CREATED).build();
+    @PostMapping("/group-broadcast")
+    @PreAuthorize("hasAnyAuthority('ADMIN', 'GROUP_LEADER')")
+    public ResponseEntity<String> broadcastLab(@RequestBody LabWorkRequest request) {
+        // 1. Получаем "технического" юзера из Spring Security
+        Object principal = SecurityContextHolder.getContext().getAuthentication().getPrincipal();
+        String email;
+
+        if (principal instanceof org.springframework.security.core.userdetails.UserDetails) {
+            email = ((org.springframework.security.core.userdetails.UserDetails) principal).getUsername();
+        } else {
+            email = principal.toString();
+        }
+
+        // 2. Ищем ТВОЕГО юзера в базе по email
+        // (Убедись, что UserRepository внедрен в этот контроллер через конструктор!)
+        by.bsuir.semesterpassport.domain.model.User domainUser = userRepository.findByEmail(email)
+                .orElseThrow(() -> new RuntimeException("Пользователь не найден в БД"));
+
+        // 3. Теперь у нас есть настоящий объект с полем GroupNumber
+        labWorkService.broadcastLabToGroup(request, domainUser.getGroupNumber());
+
+        return ResponseEntity.ok("Лабораторная успешно добавлена всей группе " + domainUser.getGroupNumber());
     }
 }
