@@ -49,6 +49,10 @@ public class SecurityConfig {
                         // 4. УПРАВЛЕНИЕ ГРУППОЙ: создание лаб для всех (доступно Админу и Старосте)
                         .requestMatchers("/api/v1/labs/group-creation").hasAnyAuthority("ADMIN", "GROUP_LEADER")
 
+// Внутри authorizeHttpRequests
+                                .requestMatchers(HttpMethod.PUT, "/api/v1/users/**").authenticated()
+                                .requestMatchers(HttpMethod.GET, "/api/v1/users/**").authenticated()
+
                         // 5. Остальные запросы (личные лабы, статы и т.д.) только после логина
                         .anyRequest().authenticated()
                 )
