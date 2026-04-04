@@ -22,13 +22,22 @@ public class AnnouncementService {
 
     @Transactional
     public Announcement updateAnnouncement(String groupNumber, String content) {
-        // Ищем существующее или создаем новое
         Announcement announcement = announcementRepository.findByGroupNumber(groupNumber)
                 .orElse(new Announcement(content, groupNumber, LocalDateTime.now()));
 
         announcement.setContent(content);
         announcement.setUpdatedAt(LocalDateTime.now());
+        announcement.setActive(true); // <--- ВАЖНО: Если староста пишет новое, оно снова активно
 
         return announcementRepository.save(announcement);
+    }
+
+    // НОВЫЙ МЕТОД: Скрываем объявление
+    @Transactional
+    public void hideAnnouncement(String groupNumber) {
+        announcementRepository.findByGroupNumber(groupNumber).ifPresent(announcement -> {
+            announcement.setActive(false);
+            announcementRepository.save(announcement);
+        });
     }
 }

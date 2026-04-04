@@ -17,5 +17,6 @@ public interface UserRepository extends JpaRepository<User, Long> {
     // Проверка существования пользователя (полезно для валидации регистрации)
     boolean existsByEmail(String email);
 
+
     List<User> findAllByGroupNumber(String groupNumber);
 }

@@ -21,6 +21,13 @@ public class Announcement {
     // Пустой конструктор для JPA
     public Announcement() {}
 
+    @Column(nullable = false)
+    private boolean isActive = true;
+
+    // Геттер и Сеттер
+    public boolean isActive() { return isActive; }
+    public void setActive(boolean active) { isActive = active; }
+
     // Конструктор со всеми полями
     public Announcement(String content, String groupNumber, LocalDateTime updatedAt) {
         this.content = content;

@@ -31,4 +31,12 @@ public class AnnouncementController {
             @RequestBody AnnouncementRequest request) {
         return ResponseEntity.ok(announcementService.updateAnnouncement(groupNumber, request.content()));
     }
+
+    // Добавь этот метод в контроллер:
+    @PatchMapping("/{groupNumber}/hide")
+    @PreAuthorize("hasAuthority('GROUP_LEADER')")
+    public ResponseEntity<Void> hideAnnouncement(@PathVariable String groupNumber) {
+        announcementService.hideAnnouncement(groupNumber);
+        return ResponseEntity.ok().build();
+    }
 }
