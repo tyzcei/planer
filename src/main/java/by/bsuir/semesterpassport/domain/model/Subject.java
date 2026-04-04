@@ -21,6 +21,12 @@ public class Subject {
 
     private LocalDateTime createdAt;
     private LocalDateTime updatedAt;
+    // Добавь это поле в Subject.java
+    private String groupNumber;
+
+    // И геттер/сеттер для него
+    public String getGroupNumber() { return groupNumber; }
+    public void setGroupNumber(String groupNumber) { this.groupNumber = groupNumber; }
 
     public Subject() {}
 
