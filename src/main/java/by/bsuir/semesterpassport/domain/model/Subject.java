@@ -54,6 +54,11 @@ public class Subject {
     public String getControlType() { return controlType; }
     public void setControlType(String controlType) { this.controlType = controlType; }
 
+
+
     public LocalDateTime getCreatedAt() { return createdAt; }
     public LocalDateTime getUpdatedAt() { return updatedAt; }
+
+    public void setId(long l) {
+    }
 }
