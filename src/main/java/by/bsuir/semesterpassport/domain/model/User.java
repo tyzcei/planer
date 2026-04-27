@@ -11,7 +11,7 @@ import java.util.List;
 
 @Entity
 @Table(name = "users")
-public class User implements UserDetails { // ИСПРАВЛЕНО: добавили имплементацию
+public class User implements UserDetails {
 
     @Id
     @GeneratedValue(strategy = GenerationType.IDENTITY)
@@ -30,6 +30,10 @@ public class User implements UserDetails { // ИСПРАВЛЕНО: добави
     @Enumerated(EnumType.STRING)
     private Role role;
 
+    // НОВОЕ ПОЛЕ: Для блокировки админом
+    @Column(nullable = false)
+    private boolean isBlocked = false;
+
     private LocalDateTime createdAt;
     private LocalDateTime updatedAt;
 
@@ -39,7 +43,7 @@ public class User implements UserDetails { // ИСПРАВЛЕНО: добави
     protected void onCreate() {
         createdAt = LocalDateTime.now();
         updatedAt = LocalDateTime.now();
-        if (role == null) role = Role.STUDENT; // Дефолтная роль
+        if (role == null) role = Role.STUDENT;
     }
 
     @PreUpdate
@@ -51,7 +55,6 @@ public class User implements UserDetails { // ИСПРАВЛЕНО: добави
 
     @Override
     public Collection<? extends GrantedAuthority> getAuthorities() {
-        // Превращаем наш Enum Role в объект, который понимает Spring
         return List.of(new SimpleGrantedAuthority(role.name()));
     }
 
@@ -62,14 +65,15 @@ public class User implements UserDetails { // ИСПРАВЛЕНО: добави
 
     @Override
     public String getUsername() {
-        return email; // Наш логин — это email
+        return email;
     }
 
     @Override
     public boolean isAccountNonExpired() { return true; }
 
+    // ИСПРАВЛЕНИЕ: Если заблокирован, Spring не пустит его!
     @Override
-    public boolean isAccountNonLocked() { return true; }
+    public boolean isAccountNonLocked() { return !isBlocked; }
 
     @Override
     public boolean isCredentialsNonExpired() { return true; }
@@ -77,11 +81,10 @@ public class User implements UserDetails { // ИСПРАВЛЕНО: добави
     @Override
     public boolean isEnabled() { return true; }
 
-    // --- Твои стандартные Геттеры и сеттеры ---
+    // --- Геттеры и сеттеры ---
 
     public Long getUserId() { return userId; }
     public void setUserId(Long userId) { this.userId = userId; }
-
 
     public String getEmail() { return email; }
     public void setEmail(String email) { this.email = email; }
@@ -100,6 +103,9 @@ public class User implements UserDetails { // ИСПРАВЛЕНО: добави
 
     public Role getRole() { return role; }
     public void setRole(Role role) { this.role = role; }
+
+    public boolean isBlocked() { return isBlocked; }
+    public void setBlocked(boolean blocked) { isBlocked = blocked; }
 
     public LocalDateTime getCreatedAt() { return createdAt; }
     public LocalDateTime getUpdatedAt() { return updatedAt; }

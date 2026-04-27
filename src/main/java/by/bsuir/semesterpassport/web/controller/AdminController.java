@@ -11,7 +11,6 @@ import java.util.List;
 
 @RestController
 @RequestMapping("/api/v1/admin")
-// ❌ ВАЖНО: Мы убрали @CrossOrigin("*"), чтобы не было конфликта с SecurityConfig!
 public class AdminController {
 
     private final UserRepository userRepository;
@@ -22,7 +21,7 @@ public class AdminController {
 
     // 1. Получить список всех пользователей
     @GetMapping("/users")
-    @PreAuthorize("hasAuthority('ADMIN')") // Явная защита метода
+    @PreAuthorize("hasAuthority('ADMIN')")
     public ResponseEntity<List<User>> getAllUsers() {
         return ResponseEntity.ok(userRepository.findAll());
     }
@@ -32,13 +31,10 @@ public class AdminController {
     @PreAuthorize("hasAuthority('ADMIN')")
     public ResponseEntity<?> updateUserRole(
             @PathVariable Long id,
-            @RequestParam String newRole) { // Принимаем String вместо Role!
+            @RequestParam String newRole) {
 
         return userRepository.findById(id).map(user -> {
-            // Конвертируем строку в Enum безопасно.
-            // (Если в классе User поле role имеет тип String, то просто user.setRole(newRole))
             user.setRole(Role.valueOf(newRole.toUpperCase()));
-
             userRepository.save(user);
             return ResponseEntity.ok().build();
         }).orElse(ResponseEntity.notFound().build());
@@ -56,5 +52,37 @@ public class AdminController {
             userRepository.save(user);
             return ResponseEntity.ok().build();
         }).orElse(ResponseEntity.notFound().build());
+    }
+
+    // 4. Заблокировать / Разблокировать пользователя
+    @PatchMapping("/users/{id}/block")
+    @PreAuthorize("hasAuthority('ADMIN')")
+    public ResponseEntity<?> toggleBlockUser(
+            @PathVariable Long id,
+            @RequestParam boolean block) {
+
+        return userRepository.findById(id).map(user -> {
+            user.setBlocked(block);
+            userRepository.save(user);
+            return ResponseEntity.ok().build();
+        }).orElse(ResponseEntity.notFound().build());
+    }
+
+    // 5. Удалить пользователя (Навсегда)
+    @DeleteMapping("/users/{id}")
+    @PreAuthorize("hasAuthority('ADMIN')")
+    public ResponseEntity<?> deleteUser(@PathVariable Long id) {
+        if (!userRepository.existsById(id)) {
+            return ResponseEntity.notFound().build();
+        }
+        userRepository.deleteById(id);
+        return ResponseEntity.ok().build();
+    }
+
+    // 6. Получить список всех уникальных групп
+    @GetMapping("/groups")
+    @PreAuthorize("hasAuthority('ADMIN')")
+    public ResponseEntity<List<String>> getAllGroups() {
+        return ResponseEntity.ok(userRepository.findDistinctGroupNumbers());
     }
 }

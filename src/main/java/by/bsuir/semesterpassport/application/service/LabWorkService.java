@@ -8,16 +8,13 @@ import by.bsuir.semesterpassport.domain.model.User;
 import by.bsuir.semesterpassport.domain.repository.LabWorkRepository;
 import by.bsuir.semesterpassport.domain.repository.SubjectRepository;
 import by.bsuir.semesterpassport.domain.repository.UserRepository;
-import org.springframework.http.ResponseEntity;
-import org.springframework.security.access.prepost.PreAuthorize;
-import org.springframework.security.core.context.SecurityContextHolder;
 import org.springframework.stereotype.Service;
 import org.springframework.transaction.annotation.Transactional;
-import org.springframework.web.bind.annotation.PostMapping;
-import org.springframework.web.bind.annotation.RequestBody;
 
 import java.time.LocalDateTime;
+import java.util.HashMap;
 import java.util.List;
+import java.util.Map;
 import java.util.stream.Collectors;
 
 @Service
@@ -38,13 +35,11 @@ public class LabWorkService {
         this.subjectRepository = subjectRepository;
     }
 
-    // 1. Получение отсортированного списка для Dashboard
     public List<LabWork> getStudentLabsSorted(Long userId) {
         List<LabWork> labs = labWorkRepository.findAllByUserUserId(userId);
         return prioritySorterService.sortLabsByPriority(labs);
     }
 
-    // 2. Создание новой лабы
     @Transactional
     public LabWork createLab(LabWorkRequest request) {
         LabWork lab = new LabWork();
@@ -63,7 +58,6 @@ public class LabWorkService {
         return labWorkRepository.save(lab);
     }
 
-    // 3. Редактирование существующей лабы
     @Transactional
     public LabWork updateLab(Long id, LabWorkRequest request) {
         LabWork lab = labWorkRepository.findById(id)
@@ -81,13 +75,11 @@ public class LabWorkService {
         return labWorkRepository.save(lab);
     }
 
-    // 4. УДАЛЕНИЕ (ОСТАВЛЯЕМ ТОЛЬКО ОДИН РАЗ)
     @Transactional
     public void deleteLab(Long id) {
         labWorkRepository.deleteById(id);
     }
 
-    // 5. Переключение статуса по кругу
     @Transactional
     public LabWork toggleStatus(Long labId, Long userId) {
         LabWork lab = labWorkRepository.findByLabIdAndUserUserId(labId, userId)
@@ -105,13 +97,9 @@ public class LabWorkService {
         return labWorkRepository.save(lab);
     }
 
-
-    // Добавь этот метод в существующий LabWorkService.java
-
     @Transactional
     public void broadcastLabToGroup(LabWorkRequest request, String groupNumber) {
         List<User> students = userRepository.findAllByGroupNumber(groupNumber);
-
         Subject subject = subjectRepository.findById(request.getSubjectId())
                 .orElseThrow(() -> new RuntimeException("Предмет не найден"));
 
@@ -127,5 +115,111 @@ public class LabWorkService {
         }).collect(Collectors.toList());
 
         labWorkRepository.saveAll(labsToSave);
+    }
+
+    // ==========================================
+    // СТАТИСТИКА ФРОНТЕНДА
+    // ==========================================
+    public Map<String, Object> getStatistics(Long userId) {
+        List<LabWork> labs = labWorkRepository.findAllByUserUserId(userId);
+
+        // 1. Статусы
+        List<Map<String, Object>> statusData = labs.stream()
+                .collect(Collectors.groupingBy(
+                        l -> translateStatus(l.getCurrentStatus()),
+                        Collectors.counting()
+                )).entrySet().stream()
+                .map(e -> Map.<String, Object>of("name", e.getKey(), "value", e.getValue()))
+                .collect(Collectors.toList());
+
+        // 2. Предметы
+        List<Map<String, Object>> subjectData = labs.stream()
+                .filter(l -> l.getSubject() != null)
+                .collect(Collectors.groupingBy(
+                        l -> l.getSubject().getTitle(),
+                        Collectors.counting()
+                )).entrySet().stream()
+                .map(e -> Map.<String, Object>of("name", e.getKey(), "value", e.getValue()))
+                .collect(Collectors.toList());
+
+        // 3. Сложность
+        List<Map<String, Object>> complexityData = labs.stream()
+                .filter(l -> l.getComplexity() != null)
+                .collect(Collectors.groupingBy(
+                        LabWork::getComplexity,
+                        Collectors.counting()
+                )).entrySet().stream()
+                .map(e -> Map.<String, Object>of("сложность", "Ур. " + e.getKey(), "количество", e.getValue()))
+                .collect(Collectors.toList());
+
+        // 4. Прогресс
+        long total = labs.size();
+        long completed = labs.stream().filter(l -> l.getCurrentStatus() == LabStatus.PROTECTED).count();
+        long inProgress = total - completed;
+
+        List<Map<String, Object>> progressData = List.of(
+                Map.<String, Object>of("name", "Защищено", "value", completed),
+                Map.<String, Object>of("name", "В работе", "value", inProgress)
+        );
+
+        // 5. НОВОЕ: Форма отчетности (Экзамен / Зачет)
+        List<Map<String, Object>> controlTypeData = labs.stream()
+                .filter(l -> l.getSubject() != null && l.getSubject().getControlType() != null)
+                .collect(Collectors.groupingBy(
+                        l -> translateControlType(l.getSubject().getControlType()),
+                        Collectors.counting()
+                )).entrySet().stream()
+                .map(e -> Map.<String, Object>of("name", e.getKey(), "value", e.getValue()))
+                .collect(Collectors.toList());
+
+        // 6. НОВОЕ: Дедлайны по месяцам
+        List<Map<String, Object>> deadlineData = labs.stream()
+                .filter(l -> l.getDeadline() != null)
+                .collect(Collectors.groupingBy(
+                        l -> l.getDeadline().getMonthValue(),
+                        Collectors.counting()
+                )).entrySet().stream()
+                .sorted(Map.Entry.comparingByKey()) // Сортируем месяцы по порядку
+                .map(e -> Map.<String, Object>of("month", translateMonth(e.getKey()), "count", e.getValue()))
+                .collect(Collectors.toList());
+
+        // Собираем всё в один большой словарь
+        Map<String, Object> result = new HashMap<>();
+        result.put("statusData", statusData);
+        result.put("subjectData", subjectData);
+        result.put("complexityData", complexityData);
+        result.put("progressData", progressData);
+        result.put("totalLabs", total);
+        result.put("controlTypeData", controlTypeData); // НОВОЕ
+        result.put("deadlineData", deadlineData);       // НОВОЕ
+
+        return result;
+    }
+
+    private String translateStatus(LabStatus status) {
+        return switch (status) {
+            case RECEIVED -> "Получено";
+            case CODED -> "Код написан";
+            case READY -> "Готово к сдаче";
+            case SUBMITTED -> "На проверке";
+            case PROTECTED -> "Защищено";
+        };
+    }
+
+    private String translateControlType(String type) {
+        if (type == null) return "Не указано";
+        String t = type.toUpperCase();
+        if (t.contains("EXAM") || t.contains("ЭКЗАМЕН")) return "Экзамен";
+        if (t.contains("CREDIT") || t.contains("ЗАЧЕТ")) return "Зачет";
+        return type;
+    }
+
+    private String translateMonth(int month) {
+        return switch (month) {
+            case 1 -> "Янв"; case 2 -> "Фев"; case 3 -> "Мар"; case 4 -> "Апр";
+            case 5 -> "Май"; case 6 -> "Июн"; case 7 -> "Июл"; case 8 -> "Авг";
+            case 9 -> "Сен"; case 10 -> "Окт"; case 11 -> "Ноя"; case 12 -> "Дек";
+            default -> "Неизвестно";
+        };
     }
 }

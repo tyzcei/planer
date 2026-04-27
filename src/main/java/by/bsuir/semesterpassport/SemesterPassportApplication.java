@@ -3,7 +3,6 @@ package by.bsuir.semesterpassport;
 import by.bsuir.semesterpassport.domain.model.Role;
 import by.bsuir.semesterpassport.domain.model.User;
 import by.bsuir.semesterpassport.domain.repository.UserRepository;
-import by.bsuir.semesterpassport.domain.model.LabStatus;
 import by.bsuir.semesterpassport.domain.model.Subject;
 import by.bsuir.semesterpassport.domain.repository.LabWorkRepository;
 import by.bsuir.semesterpassport.domain.repository.SubjectRepository;
@@ -38,12 +37,16 @@ public class SemesterPassportApplication {
             user.setFirstName("Alexandra");
             user.setLastName("Lapteva");
             user.setGroupNumber("314302");
-            user.setRole(Role.STUDENT);
+
+            // ❌ БЫЛО: user.setRole(Role.STUDENT);
+            // ✅ СТАЛО: Делаем тебя главным админом!
+            user.setRole(Role.ADMIN);
+
             // ПЕРЕЗАПИСЫВАЕМ ПАРОЛЬ ПРИ КАЖДОМ СТАРТЕ (для тестов)
             user.setPasswordHash(passwordEncoder.encode("a"));
             userRepository.save(user);
 
-            System.out.println(">>> Пользователь a@a готов. Пароль установлен в 'a'");
+            System.out.println(">>> Пользователь a@a готов. Роль: ADMIN. Пароль: 'a'");
 
             // 1. Создаем тестовый предмет
             if (subjectRepository.count() == 0) {

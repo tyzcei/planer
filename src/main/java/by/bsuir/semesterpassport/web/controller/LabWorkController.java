@@ -14,11 +14,12 @@ import org.springframework.security.core.context.SecurityContextHolder;
 import org.springframework.web.bind.annotation.*;
 
 import java.util.List;
+import java.util.Map;
 import java.util.stream.Collectors;
 
 @RestController
 @RequestMapping("/api/v1/labs")
-@CrossOrigin("*") // Разрешаем запросы с фронтенда
+@CrossOrigin("*")
 public class LabWorkController {
 
     private final LabWorkService labWorkService;
@@ -31,7 +32,6 @@ public class LabWorkController {
         this.userRepository=userRepository;
     }
 
-    // Получение списка для дашборда (с сортировкой)
     @GetMapping("/dashboard")
     public ResponseEntity<List<LabWorkDisplayDTO>> getDashboard(@RequestParam Long userId) {
         List<LabWork> sortedLabs = labWorkService.getStudentLabsSorted(userId);
@@ -41,52 +41,40 @@ public class LabWorkController {
         return ResponseEntity.ok(response);
     }
 
-    // Создание новой лабы
     @PostMapping
     public ResponseEntity<LabWorkDisplayDTO> createLab(@RequestBody LabWorkRequest request) {
-        // Сначала создаем лабу в сервисе
         LabWork createdLab = labWorkService.createLab(request);
-        // Сразу превращаем её в DTO и отправляем фронтенду
         return ResponseEntity.status(HttpStatus.CREATED).body(convertToDTO(createdLab));
     }
 
-    // Переключение статуса (Клик по кнопке на карточке)
     @PatchMapping("/{id}/toggle-status")
     public ResponseEntity<LabWorkDisplayDTO> toggleStatus(@PathVariable Long id, @RequestParam Long userId) {
         LabWork updated = labWorkService.toggleStatus(id, userId);
         return ResponseEntity.ok(convertToDTO(updated));
     }
 
-    // Удаление лабы
     @DeleteMapping("/{id}")
     public ResponseEntity<Void> deleteLab(@PathVariable Long id) {
         labWorkService.deleteLab(id);
         return ResponseEntity.noContent().build();
     }
 
-    // Редактирование (Обновление данных)
     @PutMapping("/{id}")
     public ResponseEntity<LabWorkDisplayDTO> updateLab(@PathVariable Long id, @RequestBody LabWorkRequest request) {
-        // Обновляем лабу
         LabWork updatedLab = labWorkService.updateLab(id, request);
-        // Возвращаем DTO вместо "грязной" сущности LabWork
         return ResponseEntity.ok(convertToDTO(updatedLab));
     }
 
-    /**
-     * Вспомогательный метод для превращения модели в DTO.
-     * ВАЖНО: Порядок аргументов должен строго совпадать с конструктором LabWorkDisplayDTO!
-     */
     private LabWorkDisplayDTO convertToDTO(LabWork lab) {
         return new LabWorkDisplayDTO(
                 lab.getLabId(),
                 lab.getTitle(),
                 lab.getSubject() != null ? lab.getSubject().getTitle() : "Предмет не указан",
-                lab.getSubject() != null ? lab.getSubject().getSubjectId() : null, // ДОБАВИЛИ ID ПРЕДМЕТА
+                lab.getSubject() != null ? lab.getSubject().getSubjectId() : null,
                 lab.getPractitioner() != null ? lab.getPractitioner().getFullName() : "Не назначен",
                 lab.getComplexity(),
                 lab.getDeadline(),
-                lab.getCurrentStatus().name(), // Это поле на фронте ловится как 'status'
+                lab.getCurrentStatus().name(),
                 prioritySorterService.calculateScore(lab)
         );
     }
@@ -94,7 +82,6 @@ public class LabWorkController {
     @PostMapping("/group-broadcast")
     @PreAuthorize("hasAnyAuthority('ADMIN', 'GROUP_LEADER')")
     public ResponseEntity<String> broadcastLab(@RequestBody LabWorkRequest request) {
-        // 1. Получаем "технического" юзера из Spring Security
         Object principal = SecurityContextHolder.getContext().getAuthentication().getPrincipal();
         String email;
 
@@ -104,14 +91,19 @@ public class LabWorkController {
             email = principal.toString();
         }
 
-        // 2. Ищем ТВОЕГО юзера в базе по email
-        // (Убедись, что UserRepository внедрен в этот контроллер через конструктор!)
         by.bsuir.semesterpassport.domain.model.User domainUser = userRepository.findByEmail(email)
                 .orElseThrow(() -> new RuntimeException("Пользователь не найден в БД"));
 
-        // 3. Теперь у нас есть настоящий объект с полем GroupNumber
         labWorkService.broadcastLabToGroup(request, domainUser.getGroupNumber());
 
         return ResponseEntity.ok("Лабораторная успешно добавлена всей группе " + domainUser.getGroupNumber());
+    }
+
+    // ==========================================
+    // НОВЫЙ ЭНДПОИНТ ДЛЯ СТАТИСТИКИ ФРОНТЕНДА
+    // ==========================================
+    @GetMapping("/stats")
+    public ResponseEntity<Map<String, Object>> getStatistics(@RequestParam Long userId) {
+        return ResponseEntity.ok(labWorkService.getStatistics(userId));
     }
 }
