@@ -20,15 +20,17 @@ import java.util.List;
 
 @Configuration
 @EnableWebSecurity
-@EnableMethodSecurity // Позволяет использовать @PreAuthorize в контроллерах
+@EnableMethodSecurity
 public class SecurityConfig {
 
     private final JwtAuthenticationFilter jwtAuthFilter;
     private final AuthenticationProvider authenticationProvider;
+    private final OAuth2LoginSuccessHandler oAuth2LoginSuccessHandler; // НОВОЕ ПОЛЕ
 
-    public SecurityConfig(JwtAuthenticationFilter jwtAuthFilter, AuthenticationProvider authenticationProvider) {
+    public SecurityConfig(JwtAuthenticationFilter jwtAuthFilter, AuthenticationProvider authenticationProvider, OAuth2LoginSuccessHandler oAuth2LoginSuccessHandler) {
         this.jwtAuthFilter = jwtAuthFilter;
         this.authenticationProvider = authenticationProvider;
+        this.oAuth2LoginSuccessHandler = oAuth2LoginSuccessHandler;
     }
 
     @Bean
@@ -37,24 +39,17 @@ public class SecurityConfig {
                 .cors(cors -> cors.configurationSource(corsConfigurationSource()))
                 .csrf(AbstractHttpConfigurer::disable)
                 .authorizeHttpRequests(auth -> auth
-                        // 1. Критично для React: разрешаем все предзапросы OPTIONS
                         .requestMatchers(HttpMethod.OPTIONS, "/**").permitAll()
-
-                        // 2. Публичные эндпоинты (регистрация, вход)
                         .requestMatchers("/api/v1/auth/**").permitAll()
-
-                        // 3. АДМИН-ПАНЕЛЬ: только для пользователей с ролью ADMIN
                         .requestMatchers("/api/v1/admin/**").hasAuthority("ADMIN")
-
-                        // 4. УПРАВЛЕНИЕ ГРУППОЙ: создание лаб для всех (доступно Админу и Старосте)
                         .requestMatchers("/api/v1/labs/group-creation").hasAnyAuthority("ADMIN", "GROUP_LEADER")
-
-// Внутри authorizeHttpRequests
-                                .requestMatchers(HttpMethod.PUT, "/api/v1/users/**").authenticated()
-                                .requestMatchers(HttpMethod.GET, "/api/v1/users/**").authenticated()
-
-                        // 5. Остальные запросы (личные лабы, статы и т.д.) только после логина
+                        .requestMatchers(HttpMethod.PUT, "/api/v1/users/**").authenticated()
+                        .requestMatchers(HttpMethod.GET, "/api/v1/users/**").authenticated()
                         .anyRequest().authenticated()
+                )
+                // === НОВЫЙ БЛОК OAUTH2 ===
+                .oauth2Login(oauth2 -> oauth2
+                        .successHandler(oAuth2LoginSuccessHandler)
                 )
                 .sessionManagement(session -> session
                         .sessionCreationPolicy(SessionCreationPolicy.STATELESS)
@@ -67,23 +62,14 @@ public class SecurityConfig {
 
     @Bean
     public CorsConfigurationSource corsConfigurationSource() {
+        // ... (твой существующий код CORS оставляем без изменений)
         CorsConfiguration configuration = new CorsConfiguration();
-
-        // Разрешаем фронтенд на Vite (стандартный порт 5173)
         configuration.setAllowedOrigins(List.of("http://localhost:5173"));
-
-        // Полный список методов для CRUD
         configuration.setAllowedMethods(Arrays.asList("GET", "POST", "PUT", "PATCH", "DELETE", "OPTIONS"));
-
-        // Разрешаем передачу заголовка Authorization и Content-Type
         configuration.setAllowedHeaders(Arrays.asList("Authorization", "Content-Type", "Accept", "X-Requested-With"));
-
-        // Позволяет фронтенду читать заголовок Authorization, если нужно
         configuration.setExposedHeaders(List.of("Authorization"));
-
         configuration.setAllowCredentials(true);
-        configuration.setMaxAge(3600L); // Кешируем CORS-ответ на час
-
+        configuration.setMaxAge(3600L);
         UrlBasedCorsConfigurationSource source = new UrlBasedCorsConfigurationSource();
         source.registerCorsConfiguration("/**", configuration);
         return source;

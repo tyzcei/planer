@@ -1,9 +1,9 @@
 spring:
   datasource:
-    # Порт 3306 - стандартный для MySQL
+    # Настройки подключения к MySQL
     url: jdbc:mysql://localhost:3306/planer?serverTimezone=UTC&characterEncoding=UTF-8
     username: root
-    password: root  # Если пароля нет (как часто бывает в XAMPP), оставь тут пустое место!
+    password: root  # Если в XAMPP пароля нет, оставь пустые кавычки ""
     driver-class-name: com.mysql.cj.jdbc.Driver
 
   jpa:
@@ -13,15 +13,21 @@ spring:
     properties:
       hibernate:
         format_sql: true
-        # Меняем диалект с Postgre на MySQL
         dialect: org.hibernate.dialect.MySQLDialect
 
-#  data:
-#    redis:
-#      host: localhost
-#      port: 6379
+  # Настройки OAuth2 для входа через GitHub
+  security:
+    oauth2:
+      client:
+        registration:
+          github:
+            client-id: Ov23li7xOtslqticomZi
+            client-secret: fee701073fe32a772e492b447fc1f2920bd3fbad
+            scope:
+              - user:email
+              - read:user
 
-# Настройки для JwtService (должны соответствовать пути в @Value)
+# Настройки для твоего JwtService
 application:
   security:
     jwt:
@@ -30,15 +36,3 @@ application:
 
 server:
   port: 8080
-
-#spring:
-#  security:
-#    oauth2:
-#      client:
-#        registration:
-#          github:
-#            client-id: ${GITHUB_CLIENT_ID}
-#            client-secret: ${GITHUB_CLIENT_SECRET}
-#            scope:
-#              - user:email
-#              - read:user
