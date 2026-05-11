@@ -5,6 +5,8 @@ import by.bsuir.semesterpassport.domain.model.CourseTeacher;
 import by.bsuir.semesterpassport.domain.model.TeacherNote;
 import by.bsuir.semesterpassport.domain.repository.CourseTeacherRepository;
 import by.bsuir.semesterpassport.domain.repository.TeacherNoteRepository;
+import org.springframework.cache.annotation.CacheEvict; // ИМПОРТ КЭША
+import org.springframework.cache.annotation.Cacheable; // ИМПОРТ КЭША
 import org.springframework.stereotype.Service;
 import org.springframework.transaction.annotation.Transactional;
 
@@ -24,6 +26,8 @@ public class TeacherService {
     }
 
     // Собираем Франкенштейна: Преподаватель + Заметка
+    // НОВОЕ: Кэшируем результат по номеру группы!
+    @Cacheable(value = "scheduleCache", key = "#groupNumber")
     public List<TeacherWithNoteDto> getTeachersWithNotes(String groupNumber) {
         List<CourseTeacher> teachers = teacherRepository.findByGroupNumber(groupNumber);
 
@@ -44,7 +48,9 @@ public class TeacherService {
     }
 
     // Сохранить или обновить заметку (Только для старосты)
+    // НОВОЕ: Сбрасываем кэш этой группы, если заметка обновилась!
     @Transactional
+    @CacheEvict(value = "scheduleCache", key = "#groupNumber")
     public void saveNote(String groupNumber, String bsuirUrlId, String text) {
         TeacherNote note = noteRepository.findByGroupNumberAndBsuirUrlId(groupNumber, bsuirUrlId)
                 .orElse(new TeacherNote(groupNumber, bsuirUrlId, text));

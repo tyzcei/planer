@@ -1,11 +1,13 @@
 package by.bsuir.semesterpassport.domain.model;
 
 import jakarta.persistence.*;
+
+import java.io.Serializable;
 import java.time.LocalDateTime;
 
 @Entity
 @Table(name = "teacher_notes")
-public class TeacherNote {
+public class TeacherNote implements Serializable {
 
     @Id
     @GeneratedValue(strategy = GenerationType.IDENTITY)

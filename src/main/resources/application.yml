@@ -6,6 +6,11 @@ spring:
     password: root  # Если в XAMPP пароля нет, оставь пустые кавычки ""
     driver-class-name: com.mysql.cj.jdbc.Driver
 
+  data:
+    redis:
+      host: localhost
+      port: 6379
+
   jpa:
     hibernate:
       ddl-auto: update

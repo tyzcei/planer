@@ -1,10 +1,11 @@
 package by.bsuir.semesterpassport.application.service;
 
 import by.bsuir.semesterpassport.domain.model.CourseTeacher;
-import by.bsuir.semesterpassport.domain.model.Subject; // НОВЫЙ ИМПОРТ
+import by.bsuir.semesterpassport.domain.model.Subject;
 import by.bsuir.semesterpassport.domain.repository.CourseTeacherRepository;
-import by.bsuir.semesterpassport.domain.repository.SubjectRepository; // НОВЫЙ ИМПОРТ
+import by.bsuir.semesterpassport.domain.repository.SubjectRepository;
 import by.bsuir.semesterpassport.domain.repository.UserRepository;
+import org.springframework.cache.annotation.CacheEvict;
 import org.springframework.scheduling.annotation.Scheduled;
 import org.springframework.stereotype.Service;
 import org.springframework.transaction.annotation.Transactional;
@@ -26,10 +27,9 @@ public class TeacherSyncService {
 
     private final CourseTeacherRepository courseTeacherRepository;
     private final UserRepository userRepository;
-    private final SubjectRepository subjectRepository; // НОВОЕ ПОЛЕ
+    private final SubjectRepository subjectRepository;
     private final RestTemplate restTemplate;
 
-    // ОБНОВЛЕННЫЙ КОНСТРУКТОР
     public TeacherSyncService(CourseTeacherRepository courseTeacherRepository,
                               UserRepository userRepository,
                               SubjectRepository subjectRepository) {
@@ -62,21 +62,22 @@ public class TeacherSyncService {
     @Scheduled(cron = "0 0 3 * * SUN")
     @Transactional
     public void syncTeachersWeekly() {
-        System.out.println("⏳ Запуск еженедельной синхронизации преподавателей...");
         Set<String> allGroups = userRepository.findAll().stream()
                 .map(user -> user.getGroupNumber())
                 .filter(group -> group != null && !group.isEmpty())
                 .collect(Collectors.toSet());
 
         for (String groupNumber : allGroups) {
-            syncTeachersForGroup(groupNumber);
+            try {
+                syncTeachersForGroup(groupNumber);
+            } catch (Exception e) {
+                System.err.println("Не удалось синхронизировать группу: " + groupNumber);
+            }
         }
-        System.out.println("✅ Синхронизация преподавателей завершена!");
     }
 
-
-
     @Transactional
+    @CacheEvict(value = "scheduleCache", key = "#groupNumber")
     public void syncTeachersForGroup(String groupNumber) {
         try {
             String apiUrl = "https://iis.bsuir.by/api/v1/schedule?studentGroup=" + groupNumber;
@@ -88,56 +89,62 @@ public class TeacherSyncService {
 
             courseTeacherRepository.deleteByGroupNumber(groupNumber);
 
-            // Кэш для предметов, чтобы не дергать базу данных на каждой итерации цикла
             Set<String> processedSubjects = new HashSet<>();
+            Set<String> processedTeachers = new HashSet<>();
 
             for (List<Map<String, Object>> dayLessons : schedules.values()) {
                 for (Map<String, Object> lesson : dayLessons) {
 
                     String subjectTitle = (String) lesson.get("subject");
                     String lessonType = (String) lesson.get("lessonTypeAbbrev");
-                    List<Map<String, String>> employees = (List<Map<String, String>>) lesson.get("employees");
 
-                    // === 1. УМНОЕ ПОПОЛНЕНИЕ ТАБЛИЦЫ ПРЕДМЕТОВ ===
-                    // Внутри цикла по занятиям в TeacherSyncService.java
-                    if (subjectTitle != null && !processedSubjects.contains(subjectTitle)) {
-                        // Проверяем существование ПРЕДМЕТА именно для этой ГРУППЫ
-                        boolean exists = subjectRepository.existsByTitleAndGroupNumber(subjectTitle, groupNumber);
+                    // БЕЗОПАСНЫЙ КАСТ (защита от падений)
+                    Object employeesObj = lesson.get("employees");
+                    if (employeesObj instanceof List) {
+                        List<Map<String, Object>> employees = (List<Map<String, Object>>) employeesObj;
 
-                        if (!exists) {
-                            Subject newSubject = new Subject();
-                            newSubject.setTitle(subjectTitle);
-                            newSubject.setGroupNumber(groupNumber); // ПРИВЯЗЫВАЕМ К ГРУППЕ
-                            newSubject.setControlType("CREDIT");
-                            subjectRepository.save(newSubject);
-                            System.out.println("📚 Предмет [" + subjectTitle + "] привязан к группе " + groupNumber);
+                        if (subjectTitle != null && !processedSubjects.contains(subjectTitle)) {
+                            boolean exists = subjectRepository.existsByTitleAndGroupNumber(subjectTitle, groupNumber);
+                            if (!exists) {
+                                Subject newSubject = new Subject();
+                                newSubject.setTitle(subjectTitle);
+                                newSubject.setGroupNumber(groupNumber);
+                                newSubject.setControlType("CREDIT");
+                                subjectRepository.save(newSubject);
+                            }
+                            processedSubjects.add(subjectTitle);
                         }
-                        processedSubjects.add(subjectTitle);
-                    }
 
-                    // === 2. ОБНОВЛЕНИЕ ПРЕПОДАВАТЕЛЕЙ ===
-                    if (employees != null && !employees.isEmpty() && subjectTitle != null) {
-                        for (Map<String, String> emp : employees) {
-                            String urlId = emp.get("urlId");
-                            String lastName = emp.get("lastName");
-                            String firstName = emp.get("firstName");
-                            String middleName = emp.get("middleName");
-                            String fullName = lastName + " " + (firstName != null ? firstName.charAt(0) + "." : "") + (middleName != null ? middleName.charAt(0) + "." : "");
-                            String photoLink = emp.get("photoLink");
+                        for (Map<String, Object> emp : employees) {
+                            // Защита от NULL
+                            String urlId = emp.get("urlId") != null ? String.valueOf(emp.get("urlId")) : "unknown";
+                            String uniqueTeacherKey = urlId + "_" + subjectTitle;
 
-                            CourseTeacher teacher = new CourseTeacher(
-                                    groupNumber, subjectTitle, fullName, urlId, lessonType, photoLink
-                            );
+                            if (!processedTeachers.contains(uniqueTeacherKey)) {
+                                String lastName = emp.get("lastName") != null ? String.valueOf(emp.get("lastName")) : "";
+                                String firstName = emp.get("firstName") != null ? String.valueOf(emp.get("firstName")) : "";
+                                String middleName = emp.get("middleName") != null ? String.valueOf(emp.get("middleName")) : "";
 
-                            if (!courseTeacherRepository.existsByGroupNumberAndSubjectTitleAndBsuirUrlId(groupNumber, subjectTitle, urlId)) {
-                                courseTeacherRepository.save(teacher);
+                                String fullName = lastName + " " + (!firstName.isEmpty() ? firstName.charAt(0) + "." : "") + (!middleName.isEmpty() ? middleName.charAt(0) + "." : "");
+                                String photoLink = emp.get("photoLink") != null ? String.valueOf(emp.get("photoLink")) : null;
+
+                                CourseTeacher teacher = new CourseTeacher(
+                                        groupNumber, subjectTitle, fullName.trim(), urlId, lessonType, photoLink
+                                );
+
+                                if (!courseTeacherRepository.existsByGroupNumberAndSubjectTitleAndBsuirUrlId(groupNumber, subjectTitle, urlId)) {
+                                    courseTeacherRepository.save(teacher);
+                                }
+
+                                processedTeachers.add(uniqueTeacherKey);
                             }
                         }
                     }
                 }
             }
         } catch (Exception e) {
-            System.err.println("Ошибка синхронизации группы " + groupNumber + ": " + e.getMessage());
+            // ВАЖНО: Выбрасываем ошибку, чтобы Spring отменил удаление базы при сбое!
+            throw new RuntimeException("Ошибка парсинга API: " + e.getMessage(), e);
         }
     }
 }

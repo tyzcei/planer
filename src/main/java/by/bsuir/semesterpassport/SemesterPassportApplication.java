@@ -6,6 +6,7 @@ import by.bsuir.semesterpassport.domain.repository.UserRepository;
 import by.bsuir.semesterpassport.domain.model.Subject;
 import by.bsuir.semesterpassport.domain.repository.LabWorkRepository;
 import by.bsuir.semesterpassport.domain.repository.SubjectRepository;
+import org.springframework.cache.annotation.EnableCaching;
 import org.springframework.boot.CommandLineRunner;
 import org.springframework.boot.SpringApplication;
 import org.springframework.boot.autoconfigure.SpringBootApplication;
@@ -17,6 +18,7 @@ import java.time.LocalDateTime;
 
 @SpringBootApplication
 @EnableScheduling
+@EnableCaching
 public class SemesterPassportApplication {
 
     public static void main(String[] args) {
