@@ -21,7 +21,7 @@ public class SubjectController {
 
     @GetMapping("/group/{groupNumber}")
     public ResponseEntity<List<Subject>> getSubjectsByGroup(@PathVariable String groupNumber) {
-        // Теперь это вернет только актуальные предметы для 314302
-        return ResponseEntity.ok(subjectRepository.findByGroupNumber(groupNumber));
+        // ИСПРАВЛЕНО: Теперь вызываем findAllByGroupNumber, так как мы переименовали его в репозитории
+        return ResponseEntity.ok(subjectRepository.findAllByGroupNumber(groupNumber));
     }
 }

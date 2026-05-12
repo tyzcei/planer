@@ -13,38 +13,38 @@ public class CourseTeacher {
     @Column(nullable = false)
     private String groupNumber;
 
-    @Column(nullable = false)
-    private String subjectTitle;
+    @ManyToOne(fetch = FetchType.LAZY)
+    @JoinColumn(name = "subject_id", nullable = false)
+    private Subject subject;
+
+    @ManyToOne(fetch = FetchType.EAGER) // Подгружаем сразу, чтобы видеть имя и фото
+    @JoinColumn(name = "teacher_id", nullable = false)
+    private Teacher teacher;
 
     @Column(nullable = false)
-    private String teacherName;
-
-    @Column(nullable = false)
-    private String bsuirUrlId;
-
-    @Column(nullable = false)
-    private String lessonType; // ЛК, ПЗ, ЛР
-
-    @Column(length = 500)
-    private String photoLink;
+    private String lessonType;
 
     public CourseTeacher() {}
 
-    public CourseTeacher(String groupNumber, String subjectTitle, String teacherName, String bsuirUrlId, String lessonType, String photoLink) {
+    public CourseTeacher(String groupNumber, Subject subject, Teacher teacher, String lessonType) {
         this.groupNumber = groupNumber;
-        this.subjectTitle = subjectTitle;
-        this.teacherName = teacherName;
-        this.bsuirUrlId = bsuirUrlId;
+        this.subject = subject;
+        this.teacher = teacher;
         this.lessonType = lessonType;
-        this.photoLink = photoLink;
     }
 
-    // Геттеры и сеттеры
     public Long getId() { return id; }
+    public void setId(Long id) { this.id = id; }
+
     public String getGroupNumber() { return groupNumber; }
-    public String getSubjectTitle() { return subjectTitle; }
-    public String getTeacherName() { return teacherName; }
-    public String getBsuirUrlId() { return bsuirUrlId; }
+    public void setGroupNumber(String groupNumber) { this.groupNumber = groupNumber; }
+
+    public Subject getSubject() { return subject; }
+    public void setSubject(Subject subject) { this.subject = subject; }
+
+    public Teacher getTeacher() { return teacher; }
+    public void setTeacher(Teacher teacher) { this.teacher = teacher; }
+
     public String getLessonType() { return lessonType; }
-    public String getPhotoLink() { return photoLink; }
+    public void setLessonType(String lessonType) { this.lessonType = lessonType; }
 }

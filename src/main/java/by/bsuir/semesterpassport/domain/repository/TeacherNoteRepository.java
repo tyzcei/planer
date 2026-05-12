@@ -7,9 +7,8 @@ import java.util.Optional;
 
 public interface TeacherNoteRepository extends JpaRepository<TeacherNote, Long> {
 
-    // Получить конкретную заметку
-    Optional<TeacherNote> findByGroupNumberAndBsuirUrlId(String groupNumber, String bsuirUrlId);
+    // Ищем заметку по группе и bsuirUrlId связанного преподавателя
+    Optional<TeacherNote> findByGroupNumberAndTeacher_BsuirUrlId(String groupNumber, String bsuirUrlId);
 
-    // Получить все заметки для группы
     List<TeacherNote> findByGroupNumber(String groupNumber);
 }

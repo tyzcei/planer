@@ -1,7 +1,7 @@
 spring:
   datasource:
-    # Настройки подключения к MySQL
-    url: jdbc:mysql://localhost:3306/planer?serverTimezone=UTC&characterEncoding=UTF-8
+    # Настройки подключения к новой БД MySQL (planer_2)
+    url: jdbc:mysql://localhost:3306/planer_2?serverTimezone=UTC&characterEncoding=UTF-8
     username: root
     password: root  # Если в XAMPP пароля нет, оставь пустые кавычки ""
     driver-class-name: com.mysql.cj.jdbc.Driver
@@ -13,6 +13,7 @@ spring:
 
   jpa:
     hibernate:
+      # Важно: update означает, что Hibernate не удалит твои таблицы, а только обновит их, если надо
       ddl-auto: update
     show-sql: true
     properties:

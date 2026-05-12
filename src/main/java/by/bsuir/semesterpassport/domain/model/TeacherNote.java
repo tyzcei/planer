@@ -1,7 +1,6 @@
 package by.bsuir.semesterpassport.domain.model;
 
 import jakarta.persistence.*;
-
 import java.io.Serializable;
 import java.time.LocalDateTime;
 
@@ -16,8 +15,9 @@ public class TeacherNote implements Serializable {
     @Column(nullable = false)
     private String groupNumber;
 
-    @Column(nullable = false)
-    private String bsuirUrlId;
+    @ManyToOne(fetch = FetchType.LAZY)
+    @JoinColumn(name = "teacher_id", nullable = false)
+    private Teacher teacher;
 
     @Column(columnDefinition = "TEXT")
     private String noteText;
@@ -26,9 +26,9 @@ public class TeacherNote implements Serializable {
 
     public TeacherNote() {}
 
-    public TeacherNote(String groupNumber, String bsuirUrlId, String noteText) {
+    public TeacherNote(String groupNumber, Teacher teacher, String noteText) {
         this.groupNumber = groupNumber;
-        this.bsuirUrlId = bsuirUrlId;
+        this.teacher = teacher;
         this.noteText = noteText;
         this.updatedAt = LocalDateTime.now();
     }
@@ -38,11 +38,18 @@ public class TeacherNote implements Serializable {
         this.updatedAt = LocalDateTime.now();
     }
 
-    // Геттеры и сеттеры
     public Long getId() { return id; }
+    public void setId(Long id) { this.id = id; }
+
     public String getGroupNumber() { return groupNumber; }
-    public String getBsuirUrlId() { return bsuirUrlId; }
+    public void setGroupNumber(String groupNumber) { this.groupNumber = groupNumber; }
+
+    public Teacher getTeacher() { return teacher; }
+    public void setTeacher(Teacher teacher) { this.teacher = teacher; }
+
     public String getNoteText() { return noteText; }
     public void setNoteText(String noteText) { this.noteText = noteText; }
+
     public LocalDateTime getUpdatedAt() { return updatedAt; }
+    public void setUpdatedAt(LocalDateTime updatedAt) { this.updatedAt = updatedAt; }
 }

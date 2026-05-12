@@ -2,19 +2,20 @@ package by.bsuir.semesterpassport.domain.repository;
 
 import by.bsuir.semesterpassport.domain.model.Subject;
 import org.springframework.data.jpa.repository.JpaRepository;
-import org.springframework.data.jpa.repository.Query;
-import org.springframework.data.repository.query.Param;
-import java.util.List;
+import org.springframework.stereotype.Repository;
 
+import java.util.List;
+import java.util.Optional;
+
+@Repository
 public interface SubjectRepository extends JpaRepository<Subject, Long> {
 
-    boolean existsByTitle(String title);
+    // Проверка существования конкретного предмета
     boolean existsByTitleAndGroupNumber(String title, String groupNumber);
 
-    List<Subject> findByGroupNumber(String groupNumber);
+    // Поиск конкретного предмета
+    Optional<Subject> findByTitleAndGroupNumber(String title, String groupNumber);
 
-    @Query(value = "SELECT s.* FROM subjects s " +
-            "JOIN group_subjects gs ON s.subject_id = gs.subject_id " +
-            "WHERE gs.group_number = :groupNumber", nativeQuery = true)
-    List<Subject> findAllByGroupNumber(@Param("groupNumber") String groupNumber);
+    // ИСПРАВЛЕНО: добавили "All", чтобы сервис был счастлив!
+    List<Subject> findAllByGroupNumber(String groupNumber);
 }

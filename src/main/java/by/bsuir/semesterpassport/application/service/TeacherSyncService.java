@@ -2,8 +2,10 @@ package by.bsuir.semesterpassport.application.service;
 
 import by.bsuir.semesterpassport.domain.model.CourseTeacher;
 import by.bsuir.semesterpassport.domain.model.Subject;
+import by.bsuir.semesterpassport.domain.model.Teacher;
 import by.bsuir.semesterpassport.domain.repository.CourseTeacherRepository;
 import by.bsuir.semesterpassport.domain.repository.SubjectRepository;
+import by.bsuir.semesterpassport.domain.repository.TeacherRepository;
 import by.bsuir.semesterpassport.domain.repository.UserRepository;
 import org.springframework.cache.annotation.CacheEvict;
 import org.springframework.scheduling.annotation.Scheduled;
@@ -28,14 +30,17 @@ public class TeacherSyncService {
     private final CourseTeacherRepository courseTeacherRepository;
     private final UserRepository userRepository;
     private final SubjectRepository subjectRepository;
+    private final TeacherRepository teacherRepository;
     private final RestTemplate restTemplate;
 
     public TeacherSyncService(CourseTeacherRepository courseTeacherRepository,
                               UserRepository userRepository,
-                              SubjectRepository subjectRepository) {
+                              SubjectRepository subjectRepository,
+                              TeacherRepository teacherRepository) {
         this.courseTeacherRepository = courseTeacherRepository;
         this.userRepository = userRepository;
         this.subjectRepository = subjectRepository;
+        this.teacherRepository = teacherRepository;
         this.restTemplate = createTrustAllRestTemplate();
     }
 
@@ -87,10 +92,10 @@ public class TeacherSyncService {
 
             Map<String, List<Map<String, Object>>> schedules = (Map<String, List<Map<String, Object>>>) response.get("schedules");
 
+            // Очищаем старые связки расписания (сами преподаватели и предметы остаются в базе)
             courseTeacherRepository.deleteByGroupNumber(groupNumber);
 
-            Set<String> processedSubjects = new HashSet<>();
-            Set<String> processedTeachers = new HashSet<>();
+            Set<String> processedTeachersInCycle = new HashSet<>();
 
             for (List<Map<String, Object>> dayLessons : schedules.values()) {
                 for (Map<String, Object> lesson : dayLessons) {
@@ -98,52 +103,50 @@ public class TeacherSyncService {
                     String subjectTitle = (String) lesson.get("subject");
                     String lessonType = (String) lesson.get("lessonTypeAbbrev");
 
-                    // БЕЗОПАСНЫЙ КАСТ (защита от падений)
                     Object employeesObj = lesson.get("employees");
-                    if (employeesObj instanceof List) {
+                    if (employeesObj instanceof List && subjectTitle != null) {
                         List<Map<String, Object>> employees = (List<Map<String, Object>>) employeesObj;
 
-                        if (subjectTitle != null && !processedSubjects.contains(subjectTitle)) {
-                            boolean exists = subjectRepository.existsByTitleAndGroupNumber(subjectTitle, groupNumber);
-                            if (!exists) {
-                                Subject newSubject = new Subject();
-                                newSubject.setTitle(subjectTitle);
-                                newSubject.setGroupNumber(groupNumber);
-                                newSubject.setControlType("CREDIT");
-                                subjectRepository.save(newSubject);
-                            }
-                            processedSubjects.add(subjectTitle);
-                        }
+                        // 1. Ищем или создаем ПРЕДМЕТ
+                        Subject subject = subjectRepository.findByTitleAndGroupNumber(subjectTitle, groupNumber)
+                                .orElseGet(() -> {
+                                    Subject newSubject = new Subject();
+                                    newSubject.setTitle(subjectTitle);
+                                    newSubject.setGroupNumber(groupNumber);
+                                    newSubject.setControlType("CREDIT");
+                                    return subjectRepository.save(newSubject);
+                                });
 
                         for (Map<String, Object> emp : employees) {
-                            // Защита от NULL
                             String urlId = emp.get("urlId") != null ? String.valueOf(emp.get("urlId")) : "unknown";
-                            String uniqueTeacherKey = urlId + "_" + subjectTitle;
+                            String uniqueKey = urlId + "_" + subjectTitle;
 
-                            if (!processedTeachers.contains(uniqueTeacherKey)) {
-                                String lastName = emp.get("lastName") != null ? String.valueOf(emp.get("lastName")) : "";
-                                String firstName = emp.get("firstName") != null ? String.valueOf(emp.get("firstName")) : "";
-                                String middleName = emp.get("middleName") != null ? String.valueOf(emp.get("middleName")) : "";
+                            if (!processedTeachersInCycle.contains(uniqueKey)) {
 
-                                String fullName = lastName + " " + (!firstName.isEmpty() ? firstName.charAt(0) + "." : "") + (!middleName.isEmpty() ? middleName.charAt(0) + "." : "");
-                                String photoLink = emp.get("photoLink") != null ? String.valueOf(emp.get("photoLink")) : null;
+                                // 2. Ищем или создаем ПРЕПОДАВАТЕЛЯ
+                                Teacher teacher = teacherRepository.findByBsuirUrlId(urlId)
+                                        .orElseGet(() -> {
+                                            String lastName = emp.get("lastName") != null ? String.valueOf(emp.get("lastName")) : "";
+                                            String firstName = emp.get("firstName") != null ? String.valueOf(emp.get("firstName")) : "";
+                                            String middleName = emp.get("middleName") != null ? String.valueOf(emp.get("middleName")) : "";
+                                            String fullName = lastName + " " + (!firstName.isEmpty() ? firstName.charAt(0) + "." : "") + (!middleName.isEmpty() ? middleName.charAt(0) + "." : "");
+                                            String photoLink = emp.get("photoLink") != null ? String.valueOf(emp.get("photoLink")) : null;
 
-                                CourseTeacher teacher = new CourseTeacher(
-                                        groupNumber, subjectTitle, fullName.trim(), urlId, lessonType, photoLink
-                                );
+                                            return teacherRepository.save(new Teacher(urlId, fullName.trim(), photoLink));
+                                        });
 
-                                if (!courseTeacherRepository.existsByGroupNumberAndSubjectTitleAndBsuirUrlId(groupNumber, subjectTitle, urlId)) {
-                                    courseTeacherRepository.save(teacher);
+                                // 3. Создаем СВЯЗКУ (CourseTeacher)
+                                if (!courseTeacherRepository.existsByGroupNumberAndSubject_TitleAndTeacher_BsuirUrlId(groupNumber, subjectTitle, urlId)) {
+                                    courseTeacherRepository.save(new CourseTeacher(groupNumber, subject, teacher, lessonType));
                                 }
 
-                                processedTeachers.add(uniqueTeacherKey);
+                                processedTeachersInCycle.add(uniqueKey);
                             }
                         }
                     }
                 }
             }
         } catch (Exception e) {
-            // ВАЖНО: Выбрасываем ошибку, чтобы Spring отменил удаление базы при сбое!
             throw new RuntimeException("Ошибка парсинга API: " + e.getMessage(), e);
         }
     }
